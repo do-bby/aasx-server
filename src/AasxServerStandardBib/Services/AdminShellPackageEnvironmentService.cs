@@ -109,6 +109,7 @@ namespace AasxServerStandardBib.Services
             return output;
         }
 
+
         public IAssetAdministrationShell GetAssetAdministrationShellById(string aasIdentifier, out int packageIndex)
         {
             bool found = IsAssetAdministrationShellPresent(aasIdentifier, out IAssetAdministrationShell output, out packageIndex);

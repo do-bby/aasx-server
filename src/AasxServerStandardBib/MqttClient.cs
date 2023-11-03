@@ -40,6 +40,7 @@ namespace AasxMqttClient
         static int lastSubmodel = 0;
         public static async Task StartAsync(AdminShellPackageEnv[] package, GrapevineLoggerSuper logger = null)
         {
+            
             // Create TCP based options using the builder.
             var options = new MqttClientOptionsBuilder()
                 .WithClientId("AASXPackageXplorer MQTT Client")
@@ -51,51 +52,42 @@ namespace AasxMqttClient
             await mqttClient.ConnectAsync(options);
 
             int iAASEnv = 0;
+            //package value type null => 0, not null => 1
+            int check = 1;
+            //AdminShellPackageEnv[] pack = new AdminShellPackageEnv[];                        
             for (iAASEnv = 0; iAASEnv < package.Length; iAASEnv++)
-            {
-                if (iAASEnv == lastAASEnv && package[iAASEnv] != null)
-                {
-                    //publish AAS to AAS Topic
-                    foreach (AssetAdministrationShell aas in package[iAASEnv].AasEnv.AssetAdministrationShells)
-                    {
-
-
-                        //publish submodels
-                        int iSubmodel = 0;
-                        foreach (var sm in package[iAASEnv].AasEnv.Submodels)
-                        {
-                            if (iSubmodel == lastSubmodel)
-                            {
-                                Console.WriteLine("Publish MQTT AAS " + aas.IdShort + " Submodel_" + sm.IdShort);
-
-                                var message2 = new MqttApplicationMessageBuilder()
-                                                .WithTopic("Submodel_" + sm.IdShort)
-                                                .WithPayload(Newtonsoft.Json.JsonConvert.SerializeObject(sm))
-                                                .WithExactlyOnceQoS()
-                                                .WithRetainFlag()
-                                                .Build();
-
-                                await mqttClient.PublishAsync(message2);
-                                lastSubmodel++;
-                                iSubmodel = -1;
-                                break;
-                            }
-                            iSubmodel++;
-                        }
-                        if (iSubmodel != -1)
-                        {
-                            lastSubmodel = 0;
-                            lastAASEnv++;
-                        }
-                        break;
-                    }
+            {   
+                Console.WriteLine("package" + package[iAASEnv]);
+                //package value null => break
+                if(package[iAASEnv] == null){
+                    check = 0;
                     break;
                 }
-            }
-            if (package[lastAASEnv] == null)
-            {
-                lastAASEnv = 0;
-            }
+                //publish AAS to AAS Topic
+                foreach (AssetAdministrationShell aas in package[iAASEnv].AasEnv.AssetAdministrationShells)
+                {
+                    Console.WriteLine("aas" + aas);
+                    //package value null => break
+                    if(check == 0){
+                        break;
+                    }                    
+                    foreach (var sm in package[iAASEnv].AasEnv.Submodels){
+                        Console.WriteLine("Publish MQTT AAS " + aas.IdShort + " Submodel_" + sm.IdShort);                    
+                        var message2 = new MqttApplicationMessageBuilder()
+                                            //.WithTopic("Submodel_" + sm.IdShort
+                                        .WithTopic("AASX")
+                                        .WithPayload(Newtonsoft.Json.JsonConvert.SerializeObject(sm))
+                                        .WithExactlyOnceQoS()
+                                        .WithRetainFlag()
+                                        .Build();
+                        await mqttClient.PublishAsync(message2);     
+                    }                    
+                }                    
+                //stop
+                if(check == 0){
+                    break;
+                }
+            }         
         }
     }
 }

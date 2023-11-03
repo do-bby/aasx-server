@@ -28,6 +28,11 @@ using Swashbuckle.AspNetCore.Annotations;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using AdminShellNS;
+using MQTTnet;
+using MQTTnet.Client;
+using MQTTnet.Client.Options;
+using System.Threading.Tasks;
 using System.IO;
 using System.Linq;
 using System.Net.Mime;
@@ -45,6 +50,7 @@ namespace IO.Swagger.Controllers
         private readonly IAppLogger<SubmodelRepositoryAPIApiController> _logger;
         private readonly IBase64UrlDecoderService _decoderService;
         private readonly ISubmodelService _submodelService;
+        private readonly IAdminShellPackageEnvironmentService _aasService;
         private readonly IReferenceModifierService _referenceModifierService;
         private readonly IJsonQueryDeserializer _jsonQueryDeserializer;
         private readonly IMappingService _mappingService;
@@ -52,6 +58,7 @@ namespace IO.Swagger.Controllers
         private readonly ILevelExtentModifierService _levelExtentModifierService;
         private readonly IPaginationService _paginationService;
         private readonly IAuthorizationService _authorizationService;
+        private AdminShellPackageEnv[] _packages;
 
         public SubmodelRepositoryAPIApiController(IAppLogger<SubmodelRepositoryAPIApiController> logger, IBase64UrlDecoderService decoderService, ISubmodelService submodelService, IReferenceModifierService referenceModifierService, IJsonQueryDeserializer jsonQueryDeserializer, IMappingService mappingService, IPathModifierService pathModifierService, ILevelExtentModifierService levelExtentModifierService, IPaginationService paginationService, IAuthorizationService authorizationService)
         {
@@ -2249,10 +2256,10 @@ namespace IO.Swagger.Controllers
         [SwaggerResponse(statusCode: 404, type: typeof(Result), description: "Not Found")]
         [SwaggerResponse(statusCode: 500, type: typeof(Result), description: "Internal Server Error")]
         [SwaggerResponse(statusCode: 0, type: typeof(Result), description: "Default error handling for unmentioned status codes")]
-        public virtual IActionResult PutSubmodelElementByPathSubmodelRepo([FromBody] ISubmodelElement body, [FromRoute][Required] string submodelIdentifier, [FromRoute][Required] string idShortPath, [FromQuery] string level)
-        {
-            var decodedSubmodelIdentifier = _decoderService.Decode("submodelIdentifier", submodelIdentifier);
-
+        public virtual async Task PutSubmodelElementByPathSubmodelRepo([FromBody] ISubmodelElement body, [FromRoute][Required] string submodelIdentifier, [FromRoute][Required] string idShortPath, [FromQuery] string level)
+        {            
+            
+            var decodedSubmodelIdentifier = _decoderService.Decode("submodelIdentifier", submodelIdentifier);            
             _logger.LogInformation($"Received request to replace a submodel element at {idShortPath} deom the submodel with id {decodedSubmodelIdentifier}.");
             if (!Program.noSecurity)
             {
@@ -2269,10 +2276,9 @@ namespace IO.Swagger.Controllers
                     throw new NotAllowed(authResult.Failure.FailureReasons.First().Message);
                 }
             }
-
             _submodelService.ReplaceSubmodelElementByPath(decodedSubmodelIdentifier, idShortPath, body);
 
-            return NoContent();
+            //return NoContent();
         }
 
         /// <summary>
@@ -2303,7 +2309,6 @@ namespace IO.Swagger.Controllers
             string contentType = file.ContentType;
 
             _submodelService.ReplaceFileByPath(decodedSubmodelId, idShortPath, fileName, contentType, stream);
-
             return NoContent();
         }
     }

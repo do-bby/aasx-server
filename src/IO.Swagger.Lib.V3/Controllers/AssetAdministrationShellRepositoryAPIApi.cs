@@ -19,6 +19,7 @@ using IO.Swagger.Lib.V3.Interfaces;
 using IO.Swagger.Lib.V3.Models;
 using IO.Swagger.Lib.V3.SerializationModifiers.Mappers;
 using IO.Swagger.Models;
+using IO.Swagger.Lib.V3.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -31,6 +32,12 @@ using System.IO;
 using System.Linq;
 using System.Net.Mime;
 using System.Security.Claims;
+using AdminShellNS;
+using MQTTnet;
+using MQTTnet.Client;
+using MQTTnet.Client.Options;
+using AdminShellNS;
+using System.Threading.Tasks;
 
 namespace IO.Swagger.Controllers
 {
@@ -51,6 +58,9 @@ namespace IO.Swagger.Controllers
         private readonly ILevelExtentModifierService _levelExtentModifierService;
         private readonly IPaginationService _paginationService;
         private readonly IAuthorizationService _authorizationService;
+        private readonly ISubmodelService _submodelService;
+        private readonly IJsonQueryDeserializer _jsonQueryDeserializer;
+        private AdminShellPackageEnv[] _packages;
 
         public AssetAdministrationShellRepositoryAPIApiController(IAppLogger<AssetAdministrationShellRepositoryAPIApiController> logger, IAssetAdministrationShellService aasService, IBase64UrlDecoderService decoderService, IAasRepositoryApiHelperService aasRepoApiHelper, IReferenceModifierService referenceModifierService, IMappingService mappingService, IPathModifierService pathModifierService, ILevelExtentModifierService levelExtentModifierService, IPaginationService paginationService, IAuthorizationService authorizationService)
         {
@@ -329,6 +339,7 @@ namespace IO.Swagger.Controllers
 
             var aasList = _aasService.GetAllAssetAdministrationShells(assetIds, idShort);
             var output = _paginationService.GetPaginatedList(aasList, new PaginationParameters(cursor, limit));
+            Console.WriteLine("Ok");
             return new ObjectResult(output);
         }
 
@@ -1035,9 +1046,9 @@ namespace IO.Swagger.Controllers
         {
             var decodedAasIdentifier = _decoderService.Decode("aasIdentifier", aasIdentifier);
             var decodedSubmodelIdentifier = _decoderService.Decode("submodelIdentifier", submodelIdentifier);
-
             _logger.LogInformation($"Received request to get the submodel with id {submodelIdentifier} from the AAS with id {aasIdentifier}.");
-
+            _logger.LogInformation(decodedAasIdentifier);
+            _logger.LogInformation(decodedSubmodelIdentifier);
             var submodel = _aasService.GetSubmodelById(decodedAasIdentifier, decodedSubmodelIdentifier);
             var authResult = _authorizationService.AuthorizeAsync(User, submodel, "SecurityPolicy").Result;
             if (!authResult.Succeeded)
@@ -1048,7 +1059,7 @@ namespace IO.Swagger.Controllers
                     throw new NotAllowed(failedReasons.First().Message);
                 }
             }
-            var output = _levelExtentModifierService.ApplyLevelExtent(submodel, level, extent);
+            var output = _levelExtentModifierService.ApplyLevelExtent(submodel, level, extent);            
             return new ObjectResult(output);
         }
 
@@ -1271,7 +1282,7 @@ namespace IO.Swagger.Controllers
             var decodedSubmodelIdentifier = _decoderService.Decode("submodelIdentifier", submodelIdentifier);
 
             _logger.LogInformation($"Received request to get the submodel element at {idShortPath} from the submodel with id {submodelIdentifier} and the AAS with id {aasIdentifier}.");
-
+            //_logger.LogInformation("Get Submodel element");
             var submodelElement = _aasService.GetSubmodelElementByPath(decodedAasIdentifier, decodedSubmodelIdentifier, idShortPath);
 
             if (!Program.noSecurity)
@@ -1291,7 +1302,7 @@ namespace IO.Swagger.Controllers
                 }
             }
 
-            var smeLevel = _levelExtentModifierService.ApplyLevelExtent(submodelElement, level, extent);
+            var smeLevel = _levelExtentModifierService.ApplyLevelExtent(submodelElement, level, extent);            
             return new ObjectResult(smeLevel);
         }
 
@@ -1544,9 +1555,7 @@ namespace IO.Swagger.Controllers
             var decodedAasIdentifier = _decoderService.Decode("aasIdentifier", aasIdentifier);
 
             _logger.LogInformation($"Received request to get the thumbnail of the AAS with Id {aasIdentifier}");
-
             var fileName = _aasService.GetThumbnail(decodedAasIdentifier, out byte[] content, out long fileSize);
-
             //content-disposition so that the aasx file can be doenloaded from the web browser.
             ContentDisposition contentDisposition = new()
             {
@@ -1917,7 +1926,6 @@ namespace IO.Swagger.Controllers
 
             _logger.LogInformation($"Received request to update the submodel element at {idShortPath} from submodel with id {decodedSubmodelIdentifier} from the AAS with id {decodedAasIdentifier}");
             _aasService.UpdateSubmodelElementByPath(decodedAasIdentifier, decodedSubmodelIdentifier, idShortPath, body);
-
             return NoContent();
         }
 
@@ -1955,7 +1963,6 @@ namespace IO.Swagger.Controllers
 
             //Reverse mapping from Metadata to submodel element
             ISubmodelElement submodelElement = _mappingService.Map(body, "metadata") as ISubmodelElement;
-
             //Update
             _aasService.UpdateSubmodelElementByPath(decodedAasIdentifier, decodedSubmodelIdentifier, idShortPath, submodelElement);
 
@@ -2207,6 +2214,7 @@ namespace IO.Swagger.Controllers
 
             _aasService.ReplaceAssetAdministrationShellById(decodedAasIdentifier, body);
 
+
             return NoContent();
         }
 
@@ -2240,6 +2248,7 @@ namespace IO.Swagger.Controllers
 
             _aasService.ReplaceAssetInformation(decodedAasIdentifier, body);
 
+
             return NoContent();
         }
 
@@ -2270,7 +2279,7 @@ namespace IO.Swagger.Controllers
         public virtual IActionResult PutSubmodelByIdAasRepository([FromBody] Submodel body, [FromRoute][Required] string aasIdentifier, [FromRoute][Required] string submodelIdentifier)
         {
             var decodedAasIdentifier = _decoderService.Decode("aasIdentifier", aasIdentifier);
-            var decodedSubmodelIdentifier = _decoderService.Decode("submodelIdentifier", submodelIdentifier);
+            var decodedSubmodelIdentifier = _decoderService.Decode("submodelIdentifier", submodelIdentifier);            
 
             _logger.LogInformation($"Received request to replace a a submodel {decodedSubmodelIdentifier} from the AAS {decodedAasIdentifier}");
 
@@ -2303,16 +2312,50 @@ namespace IO.Swagger.Controllers
         [SwaggerResponse(statusCode: 404, type: typeof(Result), description: "Not Found")]
         [SwaggerResponse(statusCode: 500, type: typeof(Result), description: "Internal Server Error")]
         [SwaggerResponse(statusCode: 0, type: typeof(Result), description: "Default error handling for unmentioned status codes")]
-        public virtual IActionResult PutSubmodelElementByPathAasRepository([FromBody] ISubmodelElement body, [FromRoute][Required] string aasIdentifier, [FromRoute][Required] string submodelIdentifier, [FromRoute][Required] string idShortPath)
+        public virtual async Task PutSubmodelElementByPathAasRepository([FromBody] ISubmodelElement body, [FromRoute][Required] string aasIdentifier, [FromRoute][Required] string submodelIdentifier, [FromRoute][Required] string idShortPath)
         {
             var decodedAasIdentifier = _decoderService.Decode("aasIdentifier", aasIdentifier);
             var decodedSubmodelIdentifier = _decoderService.Decode("submodelIdentifier", submodelIdentifier);
-
             _logger.LogInformation($"Received request to replace a submodel element at {idShortPath} deom the submodel with id {decodedSubmodelIdentifier} from the AAS {decodedAasIdentifier}");
+
+            //IAdministrationShell method Call
+            List<IAssetAdministrationShell> aas = _aasService.GetAllAssetAdministrationShells();
+            var submodelElements = _aasService.GetAllSubmodelElements(decodedAasIdentifier, decodedSubmodelIdentifier);
+            // Create TCP based options using the builder.
+            var options = new MqttClientOptionsBuilder()
+                .WithClientId("AASXPackageXplorer MQTT Client")
+                .WithTcpServer("localhost", 1883)
+                .Build();
+
+            //create MQTT Client and Connect using options above
+            IMqttClient mqttClient = new MqttFactory().CreateMqttClient();
+            await mqttClient.ConnectAsync(options);
+
+            //List<ISubmodelElement> ele = _submodelService.GetAllSubmodelElements(submodelIdentifier);
+       
+            //var reqSemanticId = _jsonQueryDeserializer.DeserializeReference("semanticId", semanticId);
+            //Console.WriteLine(reqSemanticId);
+            //List<ISubmodel> sub = _submodelService.GetAllSubmodels(reqSemanticId,aasIdentifier);
+
+            List<object> obj = new List<object>();
+            
+            //mqtt Call fail => AdministrationShell pacak[] type different
+            //AasxMqttClient.MqttClient.StartAsync((AdminShellPackageEnv) obj);
 
             _aasService.ReplaceSubmodelElementByPath(decodedAasIdentifier, decodedSubmodelIdentifier, idShortPath, body);
 
-            return NoContent();
+            for(int i = 0; i<submodelElements.Count;i++){
+ 
+                var msg = new MqttApplicationMessageBuilder()
+                    .WithTopic("AASX")
+                    .WithPayload(Newtonsoft.Json.JsonConvert.SerializeObject(submodelElements))
+                    .WithExactlyOnceQoS()
+                    .WithRetainFlag()
+                    .Build();
+                await mqttClient.PublishAsync(msg);                
+            }
+
+            //return NoContent();
         }
 
         /// <summary>
@@ -2343,7 +2386,6 @@ namespace IO.Swagger.Controllers
             file.CopyTo(stream);
             string fileName = file.FileName;
             string contentType = file.ContentType;
-
             _aasService.ReplaceFileByPath(decodedAasId, decodedSubmodelId, idShortPath, fileName, contentType, stream);
 
             return NoContent();

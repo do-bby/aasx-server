@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="6.13.1" />
+    <PackageReference Include="M2MqttDotnetCore" Version="1.1.0" />
   </ItemGroup>
 
   <ItemGroup>

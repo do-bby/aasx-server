@@ -1,5 +1,6 @@
 ﻿using AasOpcUaServer;
 using AasxMqttServer;
+//using AasxMqttClient;
 using AasxRestServerLibrary;
 //using AasxServerStandardBib.Migrations;
 using AdminShellNS;
@@ -637,7 +638,7 @@ namespace AasxServer
         static readonly object opcclientAddLock = new object(); // object for lock around connecting to an external opc server
 
         static MqttServer AASMqttServer = new MqttServer();
-
+        //static MqttClient AASMqttClient = new MqttClient(); 
         static bool runOPC = false;
 
         public static string connectServer = "";
@@ -1423,7 +1424,6 @@ namespace AasxServer
             }
 
             SetScriptTimer(1000); // also updates balzor view
-
             if (connectServer != "")
             {
                 HttpClient httpClient;
@@ -1465,11 +1465,10 @@ namespace AasxServer
                 }
             }
             Program.signalNewData(3);
-
             if (a.Opc && server != null)
             {
                 server.Run(); // wait for CTRL-C
-            }
+            }            
             else
             {
                 // no OPC UA: wait only for CTRL-C
@@ -1529,7 +1528,6 @@ namespace AasxServer
                     connectLoop = false;
                 }
             }
-
             if (a.Mqtt)
             {
                 AASMqttServer.MqttSeverStopAsync().Wait();
