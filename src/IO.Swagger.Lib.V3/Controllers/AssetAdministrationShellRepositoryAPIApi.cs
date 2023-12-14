@@ -2324,7 +2324,7 @@ namespace IO.Swagger.Controllers
             // Create TCP based options using the builder.
             var options = new MqttClientOptionsBuilder()
                 .WithClientId("AASXPackageXplorer MQTT Client")
-                .WithTcpServer("localhost", 1883)
+                .WithTcpServer("192.168.0.40", 1883)
                 .Build();
 
             //create MQTT Client and Connect using options above
@@ -2336,18 +2336,17 @@ namespace IO.Swagger.Controllers
             //var reqSemanticId = _jsonQueryDeserializer.DeserializeReference("semanticId", semanticId);
             //Console.WriteLine(reqSemanticId);
             //List<ISubmodel> sub = _submodelService.GetAllSubmodels(reqSemanticId,aasIdentifier);
-
-            List<object> obj = new List<object>();
             
             //mqtt Call fail => AdministrationShell pacak[] type different
             //AasxMqttClient.MqttClient.StartAsync((AdminShellPackageEnv) obj);
 
             _aasService.ReplaceSubmodelElementByPath(decodedAasIdentifier, decodedSubmodelIdentifier, idShortPath, body);
-
+            String guid = "AASX/" + decodedAasIdentifier;
+            Console.WriteLine(guid);
             for(int i = 0; i<submodelElements.Count;i++){
  
                 var msg = new MqttApplicationMessageBuilder()
-                    .WithTopic("AASX")
+                    .WithTopic(guid)
                     .WithPayload(Newtonsoft.Json.JsonConvert.SerializeObject(submodelElements))
                     .WithExactlyOnceQoS()
                     .WithRetainFlag()
